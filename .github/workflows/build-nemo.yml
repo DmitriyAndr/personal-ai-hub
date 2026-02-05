@@ -29,4 +29,4 @@ jobs:
           file: ./deployments/nemo-heretic/Dockerfile
           push: true
           # This will create an image like: ghcr.io/your-username/personal-ai-hub/nemo-heretic:latest
-          tags: ghcr.io/${{ github.repository }}/nemo-heretic:latest
+          tags: ghcr.io/dmitriyandr/personal-ai-hub/nemo-heretic:latest
