@@ -1,18 +1,27 @@
-# Stable release with CUDA 13.0 support
-FROM vllm/vllm-openai:v0.15.1
+# Use a base image with guaranteed support for RunPod drivers
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
-# Set working directory inside the container
+# Install basic system dependencies
+RUN apt-get update -y && \
+    apt-get install -y python3-pip python3-dev git && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Fix for "Error 803: system has unsupported display driver"
+# This links the container to the host's CUDA compatibility libraries
+RUN ldconfig /usr/local/cuda-12.4/compat/
+
+# Upgrade pip and install vLLM (v0.6.3 is stable for CUDA 12.4)
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir vllm==0.6.3.post1 huggingface_hub
+
+# Set the environment variable for model caching
+# This ensures models are saved to the persistent volume if it's mounted
+ENV HF_HOME="/runpod-volume/huggingface-cache/hub"
+
 WORKDIR /app
 
-# Reset the entrypoint of the base vLLM image to allow custom commands
-ENTRYPOINT []
-
-# Copy the service wrapper from the project root
-# Note: This requires setting the build context to the root directory
+# Copy the service code into the container
 COPY services/main.py /app/main.py
 
-# Set the environment variable for the specific model
-ENV MODEL_NAME="DavidAU/Mistral-Nemo-Inst-2407-12B-Thinking-Uncensored-HERETIC-HI-Claude-Opus"
-
-# Launch the service using the wrapper
-CMD ["python3", "/app/main.py"]
+# Launch the service
+ENTRYPOINT ["python3", "/app/main.py"]
