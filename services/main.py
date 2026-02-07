@@ -1,45 +1,56 @@
-import subprocess
-import time
-import sys
 import os
+import subprocess
+import sys
+from huggingface_hub import snapshot_download
 
-def start_vllm():
-    # Use environment variable or fallback to the Heretic model we chose
-    model_name = os.getenv("MODEL_NAME", "DavidAU/Mistral-Nemo-Inst-2407-12B-Thinking-Uncensored-HERETIC-HI-Claude-Opus")
+def download_model(model_name):
+    """
+    Check if the model is present and download it if necessary.
+    This prevents vLLM from failing during initial loading.
+    """
+    print(f"--- Starting model check/download for: {model_name} ---")
+    try:
+        # Download only necessary files. 
+        # snapshot_download automatically checks the cache first.
+        snapshot_download(
+            repo_id=model_name,
+            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"],
+            ignore_patterns=["*.bin", "*.pth"] # Prefer safetensors
+        )
+        print("--- Model is ready! ---")
+    except Exception as e:
+        print(f"Error downloading model: {e}")
+        sys.exit(1)
+
+def start_vllm_server(model_name):
+    """
+    Launch the vLLM OpenAI-compatible API server as a subprocess.
+    """
+    print(f"--- Launching vLLM OpenAI Server: {model_name} ---")
     
-    print(f"--- [HUB] Starting vLLM Server with model: {model_name} ---")
-    
-    # Launch vLLM as an OpenAI-compatible API server
     command = [
         "python3", "-m", "vllm.entrypoints.openai.api_server",
         "--model", model_name,
         "--host", "0.0.0.0",
         "--port", "8000",
-        "--max-model-len", "32768" # Set reasonable context window to save VRAM
+        "--max-model-len", "32768", # Adjust based on your GPU VRAM
+        "--disable-log-requests"
     ]
     
-    # Let logs stream directly to the RunPod console
-    return subprocess.Popen(command)
-
-def main():
-    print("--- [HUB] Personal AI Hub Wrapper Started ---")
-    vllm_process = start_vllm()
-    
+    # Run the server and stream logs to the console
     try:
-        while True:
-            # Check if the vLLM process is still running
-            status = vllm_process.poll()
-            if status is not None:
-                print(f"--- [HUB] vLLM process died with status {status}. Exiting... ---")
-                sys.exit(status)
-            
-            # Placeholder for future watchdog/telemetry logic
-            time.sleep(30)
-            
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"vLLM server exited with error: {e}")
     except KeyboardInterrupt:
-        print("--- [HUB] Shutting down gracefully... ---")
-        vllm_process.terminate()
-        vllm_process.wait()
+        print("Shutting down server...")
 
 if __name__ == "__main__":
-    main()
+    # Get the model name from environment variables
+    model = os.getenv("MODEL_NAME", "DavidAU/Mistral-Nemo-Inst-2407-12B-Thinking-Uncensored-HERETIC-HI-Claude-Opus")
+    
+    # Step 1: Ensure model is available
+    download_model(model)
+    
+    # Step 2: Start the server
+    start_vllm_server(model)
