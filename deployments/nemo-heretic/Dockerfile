@@ -1,5 +1,5 @@
 # Stable release with CUDA 13.0 support
-FROM vllm/vllm-openai:v0.15.1-cu130
+FROM vllm/vllm-openai:v0.15.1
 
 # Set working directory inside the container
 WORKDIR /app
