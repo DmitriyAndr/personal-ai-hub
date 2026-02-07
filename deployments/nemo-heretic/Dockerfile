@@ -4,6 +4,9 @@ FROM vllm/vllm-openai:v0.15.1-cu130
 # Set working directory inside the container
 WORKDIR /app
 
+# Reset the entrypoint of the base vLLM image to allow custom commands
+ENTRYPOINT []
+
 # Copy the service wrapper from the project root
 # Note: This requires setting the build context to the root directory
 COPY services/main.py /app/main.py
