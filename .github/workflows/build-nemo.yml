@@ -12,6 +12,14 @@ jobs:
       packages: write
 
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # This removes dotnet, android, and codeql to free up ~20GB
+          tool-cache: true
+          android: true
+          dotnet: true
+          codeql: true
       - name: Checkout code
         uses: actions/checkout@v4
 
