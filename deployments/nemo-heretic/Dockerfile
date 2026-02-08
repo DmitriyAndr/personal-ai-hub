@@ -1,27 +1,33 @@
-# Use a base image with guaranteed support for RunPod drivers
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+# Use the proven RunPod base image with PyTorch and CUDA 12.4
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
-# Install basic system dependencies
-RUN apt-get update -y && \
-    apt-get install -y python3-pip python3-dev git && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Set the working directory to the standard RunPod workspace
+WORKDIR /workspace
 
-# Fix for "Error 803: system has unsupported display driver"
-# This links the container to the host's CUDA compatibility libraries
-RUN ldconfig /usr/local/cuda-12.4/compat/
+# Install specific vLLM version and helper libraries
+# hf_transfer: drastically speeds up model downloads
+# requests: needed for API health checks
+RUN pip install --no-cache-dir \
+    vllm==0.15.1 \
+    hf_transfer \
+    requests \
+    huggingface_hub
 
-# Upgrade pip and install vLLM (v0.6.3 is stable for CUDA 12.4)
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir vllm==0.6.3.post1 huggingface_hub
+# --- Environment Variables ---
 
-# Set the environment variable for model caching
-# This ensures models are saved to the persistent volume if it's mounted
-ENV HF_HOME="/runpod-volume/huggingface-cache/hub"
+# Enable high-speed model downloads using hf_transfer
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
-WORKDIR /app
+# Ensure Python logs (print statements) are sent directly to the console in real-time
+ENV PYTHONUNBUFFERED=1
 
-# Copy the service code into the container
-COPY services/main.py /app/main.py
+# Point HuggingFace cache to the persistent network volume
+# This prevents re-downloading the 25GB+ model every time the pod starts
+ENV HF_HOME="/workspace/huggingface-cache/hub"
 
-# Launch the service
-ENTRYPOINT ["python3", "/app/main.py"]
+# Copy the management script from your local project structure
+# Ensure your local path 'services/main.py' matches your build context
+COPY services/main.py /workspace/main.py
+
+# Launch the Python manager as the entry point
+ENTRYPOINT ["python3", "main.py"]
